@@ -406,36 +406,36 @@ def parse_function_declaration_json_schema(
             declaration.parameters_json_schema
         )
     )
-    return_annotation = inspect.signature(callable).return_annotation
-    if return_annotation is inspect.Parameter.empty:
-      return declaration
+  return_annotation = inspect.signature(callable).return_annotation
+  if return_annotation is inspect.Parameter.empty:
+    return declaration
 
-    return_value = inspect.Parameter(
-        'return_value',
-        inspect.Parameter.POSITIONAL_OR_KEYWORD,
-        annotation=return_annotation,
+  return_value = inspect.Parameter(
+      'return_value',
+      inspect.Parameter.POSITIONAL_OR_KEYWORD,
+      annotation=return_annotation,
+  )
+  # This snippet catches the case when type hints are stored as strings
+  if isinstance(return_value.annotation, str):
+    return_value = return_value.replace(
+        annotation=annotation_under_future['return']
     )
-    # This snippet catches the case when type hints are stored as strings
-    if isinstance(return_value.annotation, str):
-      return_value = return_value.replace(
-          annotation=annotation_under_future['return']
+  response_json_schema: dict[str, Any] = {}
+  try:
+    if _extra_utils.is_annotation_pydantic_model(return_value.annotation):
+      response_json_schema = return_value.annotation.model_json_schema()
+    else:
+      return_value_schema_adapter = pydantic.TypeAdapter(
+          return_value.annotation,
+          config=pydantic.ConfigDict(arbitrary_types_allowed=True),
       )
-    response_json_schema: dict[str, Any] = {}
-    try:
-      if _extra_utils.is_annotation_pydantic_model(return_value.annotation):
-        response_json_schema = return_value.annotation.model_json_schema()
-      else:
-        return_value_schema_adapter = pydantic.TypeAdapter(
-            return_value.annotation,
-            config=pydantic.ConfigDict(arbitrary_types_allowed=True),
-        )
-        response_json_schema = return_value_schema_adapter.json_schema()
-      response_json_schema = _add_unevaluated_items_to_fixed_len_tuple_schema(
-          response_json_schema
-      )
-    except Exception as e:
-      _raise_for_unsupported_param(
-          return_value, callable.__name__, e
-      )
-    declaration.response_json_schema = response_json_schema
+      response_json_schema = return_value_schema_adapter.json_schema()
+    response_json_schema = _add_unevaluated_items_to_fixed_len_tuple_schema(
+        response_json_schema
+    )
+  except Exception as e:
+    _raise_for_unsupported_param(
+        return_value, callable.__name__, e
+    )
+  declaration.response_json_schema = response_json_schema
   return declaration

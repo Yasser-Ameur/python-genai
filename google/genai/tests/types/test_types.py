@@ -2571,6 +2571,34 @@ def test_function_with_tuple_contains_unevaluated_items():
   assert actual_schema_vertex.parameters_json_schema == expected_parameters_json_schema
 
 
+def test_json_schema_function_without_parameters_has_response_schema():
+  def no_params() -> int:
+    """test return type."""
+    return 1
+
+  def with_params(a: int) -> int:
+    """test return type."""
+    return a
+
+  def no_params_no_annotation():
+    """test no return type."""
+
+  for client in (mldev_client, vertex_client):
+    declarations = {
+        func.__name__: types.FunctionDeclaration.from_callable(
+            client=client, callable=func, use_json_schema=True
+        )
+        for func in (no_params, with_params, no_params_no_annotation)
+    }
+    assert declarations['no_params'].response_json_schema == {'type': 'integer'}
+    assert declarations['no_params'].parameters_json_schema is None
+    assert declarations['with_params'].response_json_schema == {
+        'type': 'integer'
+    }
+    assert declarations['no_params_no_annotation'].response_json_schema is None
+    assert declarations['no_params_no_annotation'].parameters_json_schema is None
+
+
 def test_function_gemini_api(monkeypatch):
   api_key = 'google_api_key'
   monkeypatch.setenv('GOOGLE_API_KEY', api_key)
